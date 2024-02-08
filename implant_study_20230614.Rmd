@@ -1,0 +1,375 @@
+---
+title: "Microbiome Inhalation Laura"
+output: html_notebook
+---
+
+#Load libraries
+```{r include=FALSE}
+library(ggplot2)
+library(tidyr)
+library(RColorBrewer)
+library(expss)
+library(dplyr)
+library(BiocManager)
+library(GenomicAlignments)
+library(GenomicFeatures)
+library(AnnotationDbi)
+library(Rattus.norvegicus)
+library(EnhancedVolcano)
+library(TxDb.Rnorvegicus.UCSC.rn6.refGene)
+library(topGO)
+library(gridExtra)
+library(clusterProfiler)
+library(fgsea)
+library(factoextra)
+library(tidyverse)
+library(pathview)
+library(readxl)
+library(stringr)
+library(colorRamps)
+```
+
+#prep the matrix to calculate LFC
+```{r}
+y<- read.csv("functionalprof_picrust_gg13_colon.csv", header = F)
+y<-t(y)
+y<-as.data.frame(y)
+colnames(y)<-y[1,]
+y<- y[-1,]
+
+colnames(y)[1]<-"group"
+y$group<-substr(y[,1],1,1)
+```
+
+
+```{r}
+y$group<-factor(y$group)
+i <- c(2:6911)
+y[ , i] <- apply(y[ , i], 2,            # Specify own function within apply
+                    function(x) as.numeric(as.character(x)))
+```
+
+
+```{r}
+res=aggregate(.~group,y,mean)
+df<-t(res)
+colnames(df)<-df[1,]
+df<-df[-1,]
+df<-as.data.frame(df)
+i <- c(1:4) 
+df[ , i] <- apply(df[ , i], 2,            # Specify own function within apply
+                    function(x) as.numeric(as.character(x)))
+```
+
+
+```{r}
+lfc1 <- function(a, b) log((b-a)/a + 1)
+```
+
+```{r}
+combs <- combn(colnames(df), 2)
+logfoldchanges <- apply(combs, 2, function(col_names) lfc1(df[, col_names[1]], df[, col_names[2]]))
+
+
+```
+
+```{r}
+dimnames(logfoldchanges)[[2]] <- apply(combs, 2, paste, collapse = '_')
+row.names(logfoldchanges)<-rownames(df)
+```
+
+
+```{r}
+y<-as.data.frame(logfoldchanges)
+colnames(y)<-c("High_vs_Low_Colon",
+              "High_vs_Medium_Colon",
+              "High_vs_Sham_Colon",
+              "Low_vs_Medium_Colon",
+              "Low_vs_Sham_Colon",
+              "Medium_vs_Sham_Colon")
+```
+
+#for loop for Gene and kegg enrichment
+#KEGG pathview
+```{r}
+
+plot_list_kegg<- list()
+for (i in colnames(y)) {
+    print(i)
+  x<-y[[i]]
+  names(x)<-rownames(y)
+  x<- x[order(x, decreasing = TRUE)] #reorder the genes based on significance
+  gene_list<-x
+gene_list <- gene_list[!is.infinite(gene_list)]
+gene_list <- gene_list[!duplicated(names(gene_list))]
+gene_list<-na.omit(gene_list)
+
+kegg_organism = "ko"
+kk3 <- gseKEGG(geneList     = gene_list,
+               organism     = kegg_organism,
+               minGSSize    = 3,
+               maxGSSize    = 800,
+               pvalueCutoff = 0.05,
+               pAdjustMethod = "none",
+               keyType       = "kegg")
+
+dot<-dotplot(kk3, showCategory=5, split=".sign") +
+  scale_color_distiller(palette = "RdYlBu", trans= "reverse")+
+  facet_grid(.~.sign)+
+  ggtitle(paste(i,"KEGG Enrichment"))+                                                           # Change font size
+  theme(strip.text.x = element_text(size = 12))+
+  theme(axis.text.y = element_text(size = 12))
+
+plot_list_kegg[[i]] <- dot
+
+print(dot)
+
+  data<-data.frame(kk3)
+    write.csv(data ,file=paste('KEGG_enrichment/',i,'KEGG_enrichment.csv', sep = ""))
+}
+
+```
+
+```{r}
+for (i in names(plot_list_kegg)) {
+tiff(file = paste('KEGG_enrichment/',i,'KEGG_enrichment.tiff', sep = ""), units="in", width=10, height=5, res=1000)
+print(plot_list_kegg[[i]])
+dev.off()
+}  
+```
+
+
+
+***Tissue type #2***
+
+#prep the matrix to calculate LFC
+```{r}
+y<- read.csv("Picrust ileum remove H42.csv", header = F)
+y<-t(y)
+y<-as.data.frame(y)
+colnames(y)<-y[1,]
+y<- y[-1,]
+
+colnames(y)[1]<-"group"
+y$group<-substr(y[,1],1,1)
+```
+
+
+```{r}
+y$group<-factor(y$group)
+i <- c(2:6911)
+y[ , i] <- apply(y[ , i], 2,            # Specify own function within apply
+                    function(x) as.numeric(as.character(x)))
+```
+
+
+```{r}
+res=aggregate(.~group,y,mean)
+df<-t(res)
+colnames(df)<-df[1,]
+df<-df[-1,]
+df<-as.data.frame(df)
+i <- c(1:4) 
+df[ , i] <- apply(df[ , i], 2,            # Specify own function within apply
+                    function(x) as.numeric(as.character(x)))
+```
+
+
+```{r}
+lfc1 <- function(a, b) log((b-a)/a + 1)
+```
+
+```{r}
+combs <- combn(colnames(df), 2)
+logfoldchanges <- apply(combs, 2, function(col_names) lfc1(df[, col_names[1]], df[, col_names[2]]))
+
+
+```
+
+```{r}
+dimnames(logfoldchanges)[[2]] <- apply(combs, 2, paste, collapse = '_')
+row.names(logfoldchanges)<-rownames(df)
+```
+
+
+```{r}
+y<-as.data.frame(logfoldchanges)
+colnames(y)<-c("High_vs_Low_Ileum",
+              "High_vs_Medium_Ileum",
+              "High_vs_Sham_Ileum",
+              "Low_vs_Medium_Ileum",
+              "Low_vs_Sham_Ileum",
+              "Medium_vs_Sham_Ileum")
+```
+
+
+#for loop for Gene and kegg enrichment
+#KEGG pathview
+```{r}
+
+plot_list_kegg<- list()
+for (i in colnames(y)) {
+    print(i)
+  x<-y[[i]]
+  names(x)<-rownames(y)
+  x<- x[order(x, decreasing = TRUE)] #reorder the genes based on significance
+  gene_list<-x
+gene_list <- gene_list[!is.infinite(gene_list)]
+gene_list <- gene_list[!duplicated(names(gene_list))]
+gene_list<-na.omit(gene_list)
+
+kegg_organism = "ko"
+kk3 <- gseKEGG(geneList     = gene_list,
+               organism     = kegg_organism,
+               minGSSize    = 3,
+               maxGSSize    = 800,
+               pvalueCutoff = 0.05,
+               pAdjustMethod = "none",
+               keyType       = "kegg")
+
+dot<-dotplot(kk3, showCategory=5, split=".sign") +
+  scale_color_distiller(palette = "RdYlBu", trans= "reverse")+
+  facet_grid(.~.sign)+
+  ggtitle(paste(i,"KEGG Enrichment"))+                                                           # Change font size
+  theme(strip.text.x = element_text(size = 12))+
+  theme(axis.text.y = element_text(size = 12))
+
+plot_list_kegg[[i]] <- dot
+
+print(dot)
+
+  data<-data.frame(kk3)
+    write.csv(data ,file=paste('KEGG_enrichment/',i,'KEGG_enrichment.csv', sep = ""))
+}
+
+```
+
+```{r}
+for (i in names(plot_list_kegg)) {
+tiff(file = paste('KEGG_enrichment/',i,'KEGG_enrichment.tiff', sep = ""), units="in", width=10, height=5, res=1000)
+print(plot_list_kegg[[i]])
+dev.off()
+}  
+```
+
+
+**tissue type #3**
+
+#prep the matrix to calculate LFC
+```{r}
+y<- read.csv("Picrust Jejunum.csv", header = F)
+y<-t(y)
+y<-as.data.frame(y)
+colnames(y)<-y[1,]
+y<- y[-1,]
+
+colnames(y)[1]<-"group"
+y$group<-substr(y[,1],1,1)
+```
+
+
+```{r}
+y$group<-factor(y$group)
+i <- c(2:6911)
+y[ , i] <- apply(y[ , i], 2,            # Specify own function within apply
+                    function(x) as.numeric(as.character(x)))
+```
+
+
+```{r}
+res=aggregate(.~group,y,mean)
+df<-t(res)
+colnames(df)<-df[1,]
+df<-df[-1,]
+df<-as.data.frame(df)
+i <- c(1:4) 
+df[ , i] <- apply(df[ , i], 2,            # Specify own function within apply
+                    function(x) as.numeric(as.character(x)))
+```
+
+
+```{r}
+lfc1 <- function(a, b) log((b-a)/a + 1)
+```
+
+```{r}
+combs <- combn(colnames(df), 2)
+logfoldchanges <- apply(combs, 2, function(col_names) lfc1(df[, col_names[1]], df[, col_names[2]]))
+
+
+```
+
+```{r}
+dimnames(logfoldchanges)[[2]] <- apply(combs, 2, paste, collapse = '_')
+row.names(logfoldchanges)<-rownames(df)
+```
+
+
+```{r}
+y<-as.data.frame(logfoldchanges)
+colnames(y)<-c("High_vs_Low_Jejunum",
+              "High_vs_Medium_Jejunum",
+              "High_vs_Sham_Jejunum",
+              "Low_vs_Medium_Jejunum",
+              "Low_vs_Sham_Jejunum",
+              "Medium_vs_Sham_Jejunum")
+```
+
+
+#for loop for Gene and kegg enrichment
+#KEGG pathview
+```{r}
+
+plot_list_kegg<- list()
+for (i in colnames(y)) {
+    print(i)
+  x<-y[[i]]
+  names(x)<-rownames(y)
+  x<- x[order(x, decreasing = TRUE)] #reorder the genes based on significance
+  gene_list<-x
+gene_list <- gene_list[!is.infinite(gene_list)]
+gene_list <- gene_list[!duplicated(names(gene_list))]
+gene_list<-na.omit(gene_list)
+
+kegg_organism = "ko"
+kk3 <- gseKEGG(geneList     = gene_list,
+               organism     = kegg_organism,
+               minGSSize    = 3,
+               maxGSSize    = 800,
+               pvalueCutoff = 0.05,
+               pAdjustMethod = "none",
+               keyType       = "kegg")
+
+dot<-dotplot(kk3, showCategory=5, split=".sign") +
+  scale_color_distiller(palette = "RdYlBu", trans= "reverse")+
+  facet_grid(.~.sign)+
+  ggtitle(paste(i,"KEGG_Enrichment"))+                                                           # Change font size
+  theme(strip.text.x = element_text(size = 12))+
+  theme(axis.text.y = element_text(size = 12))
+
+plot_list_kegg[[i]] <- dot
+
+print(dot)
+
+  data<-data.frame(kk3)
+    write.csv(data ,file=paste('KEGG_enrichment/',i,'KEGG_enrichment.csv', sep = ""))
+}
+
+```
+
+```{r}
+for (i in names(plot_list_kegg)) {
+tiff(file = paste('KEGG_enrichment/',i,'KEGG_enrichment.tiff', sep = ""), units="in", width=10, height=5, res=1000)
+print(plot_list_kegg[[i]])
+dev.off()
+}  
+```
+
+
+
+
+```{r}
+# Produce the native KEGG plot (PNG)
+#male_liver <- pathview(gene.data=gene_list, pathway.id="00190", species = kegg_organism)
+
+```
